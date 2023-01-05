@@ -1,0 +1,181 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.WebUtilities;
+@using RomjulDev2022.Client.Services;
+@using RomjulDev2022.Models;
+@using System.Net.Http.Headers;
+@using System.ComponentModel.DataAnnotations;
+@using System.Text.Json;
+@using System.Text;
+@using RomjulDev2022.Shared;
+@inject SpotifyService _service
+@inject HttpClient Http
+@inject NavigationManager _navigationManager
+
+
+@if (_loading)
+{
+    <p>Loading..</p>
+}
+else
+{
+    <h2>Welcome @_user?.Name!</h2>
+
+    <span style="display: inline;">
+        <button @onclick="_ => SetTopType(SpotifyTopType.Artists)">Artists</button>
+        <button @onclick="_ => SetTopType(SpotifyTopType.Tracks)">Tracks</button>
+    </span>
+    <br />
+    <br />
+    <span style="display: inline;">
+        <button @onclick="_ => SetTimeInterval(SpotifyTimeInterval.Short)">Short-Term</button>
+        <button @onclick="_ => SetTimeInterval(SpotifyTimeInterval.Medium)">Medium-Term</button>
+        <button @onclick="_ => SetTimeInterval(SpotifyTimeInterval.Long)">Long-Term</button>
+    </span>
+
+    if (_artists is not null)
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Name</th>
+                    <th>Genres</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var artist in _artists.Items)
+                {
+                    <tr>
+                        <td>
+                            <img 
+                                height="80"
+                                width="80"
+                                src="@(artist.Images
+                                    .OrderByDescending(i => i.Height)
+                                    .Select(i => i.Url)
+                                    .FirstOrDefault())" />
+                        </td>
+                        <td>
+                            <a 
+                                target="_blank"
+                                href="@(artist.ExternalUrls
+                                    .Where(url => url.Key == "spotify")
+                                    .Select(url => url.Value).FirstOrDefault())">@artist.Name</a>
+                        </td>
+                        <td>@string.Join(", ", artist.Genres.Select(g => CapitalizeFirstLetter(g)))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <span style="display: inline;">
+            <button 
+                hidden="@(_artists.PreviousPage is null)"
+                @onclick="async _ => _artists = await _service.GetAsync<SpotifyArtists>(new Uri(_artists.PreviousPage!))">
+                    Previous page
+            </button>
+            <button 
+                hidden="@(_artists.NextPage is null)"
+                @onclick="async _ => _artists = await _service.GetAsync<SpotifyArtists>(new Uri(_artists.NextPage!))">
+                    Next page
+            </button>
+        </span>
+    }
+    else if (_tracks is not null)
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th></th>
+                    <th>Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var track in _tracks.Items)
+                {
+                    <tr>
+                        <td>
+                            <button @onclick="@(async _ => await _service.PlayTrackAsync(track.Id!))">Play</button>
+                        </td>
+                        <td>
+                            <img height="80"
+                                 width="80"
+                                 src="@(track.Album?.Images
+                                    .OrderByDescending(i => i.Height)
+                                    .Select(i => i.Url)
+                                    .FirstOrDefault())" />
+                        </td>
+                        <td>
+                            <a target="_blank"
+                               href="@(track.ExternalUrls
+                                    .Where(url => url.Key == "spotify")
+                                    .Select(url => url.Value).FirstOrDefault())">@track.Name</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <span style="display: inline;">
+            <button 
+                hidden="@(_tracks.PreviousPage is null)"
+                    @onclick="async _ => _tracks = await _service.GetAsync<SpotifyTracks>(new Uri(_tracks.PreviousPage!))">
+                    Previous page
+            </button>
+            <button 
+                hidden="@(_tracks.NextPage is null)"
+                    @onclick="async _ => _tracks = await _service.GetAsync<SpotifyTracks>(new Uri(_tracks.NextPage!))">
+                    Next page
+            </button>
+        </span>
+    }
+}
+
+@code {
+    private bool _loading;
+    private SpotifyProfile? _user;
+    private SpotifyArtists? _artists;
+    private SpotifyTracks? _tracks;
+    private SpotifyTopType _currentTopType = SpotifyTopType.Artists;
+    private SpotifyTimeInterval _currentTimeInterval = SpotifyTimeInterval.Medium;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+
+        await _service.SignIn();
+
+        await Task.WhenAll(
+            RefreshUser(),
+            RefreshTopList());
+
+        _loading = false;
+    }
+
+    private async Task RefreshUser() =>
+        _user = await _service.GetSpotifyUserAsync();
+
+    private async Task RefreshTopList()
+    {
+        _artists = null;
+        _tracks = null;
+
+        if (_currentTopType == SpotifyTopType.Tracks)
+            _tracks = await _service.GetSpotifyTopListAsync<SpotifyTracks>(_currentTopType, _currentTimeInterval);
+        else if (_currentTopType == SpotifyTopType.Artists)
+            _artists = await _service.GetSpotifyTopListAsync<SpotifyArtists>(_currentTopType, _currentTimeInterval);
+    }
+
+    private async Task SetTimeInterval(SpotifyTimeInterval timeInterval)
+    {
+        _currentTimeInterval = timeInterval;
+        await RefreshTopList();
+    }
+
+    private async Task SetTopType(SpotifyTopType topType)
+    {
+        _currentTopType = topType;
+        await RefreshTopList();
+    }
+
+    private string CapitalizeFirstLetter(string input) => $"{input[0].ToString().ToUpper()}{input.Substring(1)}";
+}
