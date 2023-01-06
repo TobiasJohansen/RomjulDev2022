@@ -1,13 +1,12 @@
-﻿using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Cosmos.Fluent;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Azure.Cosmos.Fluent;
+using Microsoft.Azure.Cosmos;
+using Azure.Identity;
 
-namespace RomjulDev2022.Database;
+namespace RomjulDev2022.Server;
 
-public static class ServiceCollectionExtensions
+internal static class ServiceCollectionExtensions
 {
-    public static void AddCosmosDbClient(this IServiceCollection serviceCollection, IConfiguration config)
+    public static void AddCosmosDb(this IServiceCollection serviceCollection, IConfiguration config)
     {
         serviceCollection.AddSingleton(serviceProvider =>
             new CosmosClientBuilder(

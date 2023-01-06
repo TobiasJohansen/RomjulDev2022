@@ -1,13 +1,22 @@
+using Azure.Identity;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using RomjulDev2022.Database;
 using RomjulDev2022.Server.Options;
 using RomjulDev2022.Tokens;
+using RomjulDev2022.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSwaggerGen();
+
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddAzureKeyVault(
+        new Uri($"https://kv-romjuldev2022-prod.vault.azure.net/"),
+        new DefaultAzureCredential());
+}
 
 builder.Services
     .AddAuthentication(options =>
@@ -37,9 +46,9 @@ builder.Services.AddHttpClient();
 
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddSingleton<ITokenRepository, TokenRepository>();
-
 builder.Services.Configure<SpotifyOptions>(builder.Configuration.GetSection("Spotify"));
-builder.Services.AddCosmosDbClient(builder.Configuration);
+
+builder.Services.AddCosmosDb(builder.Configuration);
 
 var app = builder.Build();
 
